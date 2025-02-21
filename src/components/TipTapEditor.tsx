@@ -83,59 +83,60 @@ export default function TipTapEditor({ website, preview, onAccept, onReject }: P
       <span style="background-color: #dcfce7; color: #16a34a; padding: 0 2px; margin-left: 4px;">${suggested}</span>
     `;
 
-    // Function to find and replace text while preserving HTML structure
-    const findAndReplaceText = (content: string, searchText: string, replacement: string) => {
-      // Escape special characters in the search text for regex
-      const escapedSearch = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      
-      // Create a regex that matches the text, including potential HTML tags within
-      const regex = new RegExp(
-        `(${escapedSearch.replace(/\s+/g, '\\s*(?:<[^>]+>\\s*)*')})`
-      );
-
-      return content.replace(regex, replacement);
-    };
-
     // Handle different types of previews
     switch (type) {
       case 'title':
+        // Replace title text directly
         const content = editor.getHTML();
-        const newTitleContent = findAndReplaceText(content, original, highlightedContent);
+        const newTitleContent = content.replace(
+          original,
+          highlightedContent
+        );
         editor.commands.setContent(newTitleContent);
         break;
 
       case 'description':
+        // Replace description text directly
         const descContent = editor.getHTML();
-        const newDescContent = findAndReplaceText(descContent, original, highlightedContent);
+        const newDescContent = descContent.replace(
+          original,
+          highlightedContent
+        );
         editor.commands.setContent(newDescContent);
         break;
 
       case 'heading':
       case 'custom':
+        // For headings and custom content
         const otherContent = editor.getHTML();
-        const newContent = findAndReplaceText(otherContent, original, highlightedContent);
+        const newContent = otherContent.replace(
+          original,
+          highlightedContent
+        );
         editor.commands.setContent(newContent);
         break;
     }
 
   }, [editor, preview, originalContent]);
 
-  // Update the accept handler to handle complex replacements
+  // Update the accept handler to properly remove strikethrough text
   const handleAccept = () => {
     if (!editor || !preview) return;
 
     const { type, original, suggested } = preview;
     
-    const content = editor.getHTML();
-    
-    // Replace the highlighted spans with suggested text
-    const newContent = content.replace(
-      /<span[^>]*>(?:[^<]|<(?!\/span>))*<\/span>\s*<span[^>]*>(?:[^<]|<(?!\/span>))*<\/span>/g,
-      suggested
+    // Use a more flexible pattern to find and replace the highlighted spans
+    const pattern = new RegExp(
+      `<span[^>]*>[^<]*(${original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})[^<]*</span>\\s*<span[^>]*>[^<]*</span>`,
+      'g'
     );
     
-    editor.commands.setContent(newContent);
-    setOriginalContent(newContent);
+    editor.commands.setContent(
+      editor.getHTML().replace(pattern, suggested)
+    );
+
+    // Update original content after changes
+    setOriginalContent(editor.getHTML());
     onAccept?.({ 
       old: original, 
       new: suggested,

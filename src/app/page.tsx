@@ -37,8 +37,8 @@ export default function Home() {
 
       const data = await response.json();
       setAnalysis({
-        meta: data.analysis,
-        headings: null
+        meta: data.analysis.meta,
+        headings: data.analysis.headings
       });
       setTargetSite(data.targetSite);
       setCompetitors(data.competitors);
