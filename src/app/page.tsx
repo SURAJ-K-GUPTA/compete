@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { WebsiteData, MetaAnalysis } from '@/types';
+import { WebsiteData, MetaAnalysis, HeadingAnalysis } from '@/types';
 import ComparisonDashboard from '@/components/ComparisonDashboard';
 import UrlInput from '@/components/UrlInput';
 import LoadingState from '@/components/LoadingState';
@@ -12,7 +12,10 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [analysis, setAnalysis] = useState<MetaAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<{
+    meta: MetaAnalysis;
+    headings?: HeadingAnalysis | null;
+  } | null>(null);
   const [targetSite, setTargetSite] = useState<WebsiteData | null>(null);
   const [competitors, setCompetitors] = useState<WebsiteData[]>([]);
 
@@ -33,7 +36,10 @@ export default function Home() {
       }
 
       const data = await response.json();
-      setAnalysis(data.analysis);
+      setAnalysis({
+        meta: data.analysis,
+        headings: null
+      });
       setTargetSite(data.targetSite);
       setCompetitors(data.competitors);
     } catch (error) {
