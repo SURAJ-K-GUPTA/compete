@@ -125,18 +125,35 @@ export default function TipTapEditor({ website, preview, onAccept, onReject }: P
 
     const { type, original, suggested } = preview;
     
-    // Use a more flexible pattern to find and replace the highlighted spans
-    const pattern = new RegExp(
-      `<span[^>]*>[^<]*(${original.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})[^<]*</span>\\s*<span[^>]*>[^<]*</span>`,
-      'g'
-    );
+    // Get current content
+    const content = editor.getHTML();
     
-    editor.commands.setContent(
-      editor.getHTML().replace(pattern, suggested)
-    );
+    // Create a temporary div to handle HTML string manipulation
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = content;
+    
+    // Find and replace the highlighted spans
+    const highlightedSpans = tempDiv.querySelectorAll('span');
+    highlightedSpans.forEach((span) => {
+      if (span.textContent?.includes(original)) {
+        const parentElement = span.parentElement;
+        if (parentElement) {
+          // Find the next span (suggested text)
+          const nextSpan = span.nextElementSibling;
+          if (nextSpan) {
+            // Replace both spans with suggested text
+            const textNode = document.createTextNode(suggested);
+            parentElement.replaceChild(textNode, span);
+            parentElement.removeChild(nextSpan);
+          }
+        }
+      }
+    });
 
-    // Update original content after changes
-    setOriginalContent(editor.getHTML());
+    // Update editor content
+    editor.commands.setContent(tempDiv.innerHTML);
+    setOriginalContent(tempDiv.innerHTML);
+    
     onAccept?.({ 
       old: original, 
       new: suggested,
