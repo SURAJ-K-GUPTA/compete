@@ -15,35 +15,18 @@ import { useEffect, useState } from 'react';
 import { Preview, WebsiteData } from '@/types';
 import { FiBold, FiItalic, FiUnderline, FiAlignLeft, FiAlignCenter, FiAlignRight, FiLink, FiType } from 'react-icons/fi';
 import { Level } from '@tiptap/extension-heading';
+import { marked } from 'marked';
 
 interface Props {
   website: WebsiteData;
   preview: Preview | null;
+  showInitialContent?: boolean;
   onAccept?: (change: { old: string; new: string; type: string }) => void;
   onReject?: () => void;
 }
 
-export default function TipTapEditor({ website, preview, onAccept, onReject }: Props) {
+export default function TipTapEditor({ website, preview, showInitialContent = false, onAccept, onReject }: Props) {
   const [originalContent, setOriginalContent] = useState('');
-
-  // Update editor content when website changes
-  useEffect(() => {
-    const formattedContent = `
-      <div class="website-content">
-        <h1 class="website-title">${website.title}</h1>
-        <p class="meta-description">${website.metaDescription}</p>
-        <div class="content">
-          ${website.content}
-        </div>
-      </div>
-    `;
-    setOriginalContent(formattedContent);
-    
-    // Update editor content if it exists
-    if (editor) {
-      editor.commands.setContent(formattedContent);
-    }
-  }, [website]); // Add website as dependency
 
   const editor = useEditor({
     extensions: [
@@ -68,7 +51,32 @@ export default function TipTapEditor({ website, preview, onAccept, onReject }: P
     ],
     content: originalContent,
     editable: true,
+    parseOptions: {
+      preserveWhitespace: 'full',
+    },
   });
+
+  // Update editor content when website changes
+  useEffect(() => {
+    if (!editor || !website) return;
+
+    // Convert markdown content to HTML using marked
+    const formattedContent = `
+      <div class="website-content">
+        <h1 class="website-title">${website.title}</h1>
+        <p class="meta-description">${website.metaDescription}</p>
+        <div class="content">
+          ${marked(website.content)}
+        </div>
+      </div>
+    `;
+
+    // Set content immediately if showInitialContent is true or if there's a preview
+    if (showInitialContent || preview) {
+      setOriginalContent(formattedContent);
+      editor.commands.setContent(formattedContent);
+    }
+  }, [website, editor, showInitialContent, preview]);
 
   useEffect(() => {
     if (!editor || !preview) return;
@@ -173,8 +181,8 @@ export default function TipTapEditor({ website, preview, onAccept, onReject }: P
 
   return (
     <div className="relative border rounded-lg">
-      {/* Toolbar with Accept/Reject */}
-      <div className="border-b p-2 flex justify-between bg-gray-50">
+      {/* Toolbar with Accept/Reject - Stays fixed */}
+      <div className="sticky top-0 z-10 border-b p-2 flex justify-between bg-gray-50">
         <div className="flex gap-2">
           <button
             onClick={() => editor.chain().focus().toggleBold().run()}
@@ -249,14 +257,49 @@ export default function TipTapEditor({ website, preview, onAccept, onReject }: P
         )}
       </div>
 
-      {/* Editor Content */}
-      <div className="prose max-w-none p-4">
-        <EditorContent editor={editor} />
+      {/* Scrollable Editor Content */}
+      <div className="overflow-y-auto max-h-[600px] prose-container">
+        <div className="prose max-w-none p-4">
+          <EditorContent editor={editor} />
+        </div>
       </div>
 
-      {/* Bubble Menu */}
-      {editor && (
-        <BubbleMenu editor={editor} tippyOptions={{ duration: 100 }}>
+      {/* Bubble Menu - with proper checks */}
+      {editor && editor.isEditable && (
+        <BubbleMenu 
+          editor={editor} 
+          shouldShow={({ editor, view, state, from, to }) => {
+            // Only show menu when there's a text selection
+            const { empty } = editor.state.selection;
+            const hasText = !empty;
+            
+            // Check if selection is valid
+            const isValidSelection = from !== to;
+            
+            return hasText && isValidSelection;
+          }}
+          tippyOptions={{ 
+            duration: 100,
+            placement: 'top',
+            // Add fallback options
+            appendTo: () => document.body,
+            getReferenceClientRect: () => {
+              const { ranges } = editor.state.selection;
+              const from = ranges[0].$from;
+              const to = ranges[0].$to;
+              
+              if (from && to) {
+                const node = editor.view.nodeDOM(from.pos);
+                if (node instanceof Element) {
+                  return node.getBoundingClientRect();
+                }
+              }
+              
+              // Fallback to editor container
+              return editor.view.dom.getBoundingClientRect();
+            }
+          }}
+        >
           <div className="flex gap-1 bg-white shadow-lg rounded-lg border p-1">
             <button
               onClick={() => editor.chain().focus().toggleBold().run()}

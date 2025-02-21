@@ -15,6 +15,7 @@ interface Props {
   preview: Preview | null;
   onClose: () => void;
   targetSite: WebsiteData;
+  showInitialContent?: boolean;
 }
 
 interface CodeBlockProps {
@@ -77,7 +78,7 @@ const DiffView = ({ original, edited }: { original: string; edited: string }) =>
   );
 };
 
-export default function PreviewEditor({ preview, onClose, targetSite }: Props) {
+export default function PreviewEditor({ preview, onClose, targetSite, showInitialContent }: Props) {
   return (
     <div className="bg-white rounded-xl shadow-sm p-6">
       <div className="flex justify-between items-center mb-6">
@@ -96,6 +97,7 @@ export default function PreviewEditor({ preview, onClose, targetSite }: Props) {
         key={targetSite.url}
         website={targetSite}
         preview={preview}
+        showInitialContent={showInitialContent}
         onAccept={(change) => {
           console.log('Change accepted:', change);
           onClose();
