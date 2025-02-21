@@ -10,6 +10,10 @@ import { WebsiteData } from '@/types';
  * Handles website scraping, competitor analysis, and OpenAI integration
  * Includes validation, error handling, and rate limiting
  */
+
+// Set the maximum duration for the API call to 60 seconds
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

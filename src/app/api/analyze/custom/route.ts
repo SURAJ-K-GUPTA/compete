@@ -6,7 +6,7 @@ import { config } from '@/config/env';
 const openai = new OpenAI({
   apiKey: config.openai.apiKey
 });
-
+export const maxDuration = 60;
 export async function POST(request: Request) {
   try {
     const body = await request.json();
