@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebsiteData, MetaAnalysis, HeadingAnalysis, CustomAgent } from '@/types';
-import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2, FiRefreshCw } from 'react-icons/fi';
 import MetaCard from './MetaCard';
 import SuggestionCard from './SuggestionCard';
 import PreviewEditor from './PreviewEditor';
@@ -11,6 +11,10 @@ import HeadingAnalysisDashboard from './HeadingAnalysisDashboard';
 import CustomAgentDashboard from './CustomAgentDashboard';
 import AddAgentModal from './AddAgentModal';
 import Toast from './ui/Toast';
+import MetaAnalysisAgent from './agents/MetaAnalysisAgent';
+import HeadingAnalysisAgent from './agents/HeadingAnalysisAgent';
+import CustomAgentCard from './agents/CustomAgentCard';
+import DeleteAgentDialog from './DeleteAgentDialog';
 
 interface Props {
   analysis: {
@@ -37,6 +41,8 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
     context?: string;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reanalyzingAgents, setReanalyzingAgents] = useState<string[]>([]);
+  const [agentToDelete, setAgentToDelete] = useState<CustomAgent | null>(null);
 
   // Reset state when new analysis comes in
   useEffect(() => {
@@ -95,11 +101,71 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
     setExpandedAgent(newAgent.id);
   };
 
-  // Add delete handler
+  // Update delete handler
   const handleDeleteAgent = (agentId: string) => {
-    setCustomAgents(agents => agents.filter(a => a.id !== agentId));
-    if (expandedAgent === agentId) {
-      setExpandedAgent(null);
+    const agent = customAgents.find(a => a.id === agentId);
+    if (agent) {
+      setAgentToDelete(agent);
+    }
+  };
+
+  // Add confirmDelete handler
+  const confirmDelete = () => {
+    if (agentToDelete) {
+      setCustomAgents(agents => agents.filter(a => a.id !== agentToDelete.id));
+      if (expandedAgent === agentToDelete.id) {
+        setExpandedAgent(null);
+      }
+      setAgentToDelete(null);
+    }
+  };
+
+  // Update handleReanalyze
+  const handleReanalyze = async (agentId: string) => {
+    setReanalyzingAgents(prev => [...prev, agentId]);
+    
+    try {
+      if (agentId === 'meta' || agentId === 'headings') {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            targetUrl: targetSite.url,
+            competitorUrls: competitors.map(c => c.url)
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          if (agentId === 'meta') {
+            analysis.meta = data.analysis.meta;
+          } else {
+            analysis.headings = data.analysis.headings;
+          }
+        }
+      } else {
+        const agent = customAgents.find(a => a.id === agentId);
+        if (!agent) return;
+
+        const response = await fetch('/api/analyze/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: agent.prompt,
+            targetSite,
+            competitors
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          setCustomAgents(agents => agents.map(a => 
+            a.id === agentId ? { ...a, analysis: data.analysis } : a
+          ));
+        }
+      }
+    } catch (err) {
+      setError('Failed to reanalyze');
+    } finally {
+      setReanalyzingAgents(prev => prev.filter(id => id !== agentId));
     }
   };
 
@@ -119,145 +185,42 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
 
         {/* Right side - Analysis Cards (30%) */}
         <div className="w-[30%] space-y-4">
-          {/* Meta Analysis Card */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <button
-              onClick={() => setExpandedAgent(expandedAgent === 'meta' ? null : 'meta')}
-              className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50"
-            >
-              <h3 className="text-lg font-medium text-gray-800">Meta Analysis</h3>
-              {expandedAgent === 'meta' ? <FiChevronUp /> : <FiChevronDown />}
-            </button>
-            <AnimatePresence>
-              {expandedAgent === 'meta' && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="px-4 pb-4"
-                >
-                  <MetaCard
-                    title="Title Analysis"
-                    score={analysis.meta.titleScore}
-                    length={analysis.meta.titleLength}
-                    maxLength={60}
-                    original={targetSite.title}
-                  />
-                  {analysis.meta.suggestions
-                    .filter(s => s.type === 'title')
-                    .map((suggestion, index) => (
-                      <SuggestionCard
-                        key={`title-${index}`}
-                        suggestion={suggestion}
-                        onPreview={() => {
-                          setSelectedPreview({
-                            type: suggestion.type,
-                            original: suggestion.original,
-                            suggested: suggestion.suggested
-                          });
-                        }}
-                      />
-                    ))}
-                  <MetaCard
-                    title="Description Analysis"
-                    score={analysis.meta.descriptionScore}
-                    length={analysis.meta.descriptionLength}
-                    maxLength={155}
-                    original={targetSite.metaDescription}
-                  />
-                  {analysis.meta.suggestions
-                    .filter(s => s.type === 'description')
-                    .map((suggestion, index) => (
-                      <SuggestionCard
-                        key={`description-${index}`}
-                        suggestion={suggestion}
-                        onPreview={() => {
-                          setSelectedPreview({
-                            type: suggestion.type,
-                            original: suggestion.original,
-                            suggested: suggestion.suggested
-                          });
-                        }}
-                      />
-                    ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* Meta Analysis */}
+          <MetaAnalysisAgent
+            analysis={analysis.meta}
+            targetSite={targetSite}
+            isExpanded={expandedAgent === 'meta'}
+            isReanalyzing={reanalyzingAgents.includes('meta')}
+            onToggle={() => setExpandedAgent(expandedAgent === 'meta' ? null : 'meta')}
+            onReanalyze={() => handleReanalyze('meta')}
+            onPreview={setSelectedPreview}
+          />
 
-          {/* Heading Analysis Card */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <button
-              onClick={() => setExpandedAgent(expandedAgent === 'headings' ? null : 'headings')}
-              className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50"
-            >
-              <h3 className="text-lg font-medium text-gray-800">Heading Analysis</h3>
-              {expandedAgent === 'headings' ? <FiChevronUp /> : <FiChevronDown />}
-            </button>
-            <AnimatePresence>
-              {expandedAgent === 'headings' && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="px-4 pb-4"
-                >
-                  <HeadingAnalysisDashboard
-                    analysis={analysis.headings}
-                    onPreview={(suggestion) => {
-                      setSelectedPreview({
-                        type: 'heading',
-                        original: suggestion.original,
-                        suggested: suggestion.suggested,
-                        html: targetSite.content
-                      });
-                    }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* Heading Analysis */}
+          <HeadingAnalysisAgent
+            analysis={analysis.headings ?? null}
+            isExpanded={expandedAgent === 'headings'}
+            isReanalyzing={reanalyzingAgents.includes('headings')}
+            onToggle={() => setExpandedAgent(expandedAgent === 'headings' ? null : 'headings')}
+            onReanalyze={() => handleReanalyze('headings')}
+            onPreview={setSelectedPreview}
+            html={targetSite.content}
+          />
 
-          {/* Custom Agent Cards */}
+          {/* Custom Agents */}
           {customAgents.map(agent => (
-            <div key={agent.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 flex justify-between items-center hover:bg-gray-50">
-                <button
-                  onClick={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
-                  className="flex-1 text-left"
-                >
-                  <h3 className="text-lg font-medium text-gray-800">{agent.name}</h3>
-                </button>
-                <div className="flex items-center gap-2">
-                  {expandedAgent === agent.id ? <FiChevronUp /> : <FiChevronDown />}
-                  <button
-                    onClick={() => handleDeleteAgent(agent.id)}
-                    className="ml-2 p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full"
-                  >
-                    <FiTrash2 size={16} />
-                  </button>
-                </div>
-              </div>
-              <AnimatePresence>
-                {expandedAgent === agent.id && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="px-4 pb-4"
-                  >
-                    <CustomAgentDashboard
-                      agent={agent}
-                      targetSite={targetSite}
-                      competitors={competitors}
-                      onPreview={(preview) => {
-                        setSelectedPreview(preview);
-                      }}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <CustomAgentCard
+              key={agent.id}
+              agent={agent}
+              targetSite={targetSite}
+              competitors={competitors}
+              isExpanded={expandedAgent === agent.id}
+              isReanalyzing={reanalyzingAgents.includes(agent.id)}
+              onToggle={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
+              onReanalyze={() => handleReanalyze(agent.id)}
+              onDelete={() => handleDeleteAgent(agent.id)}
+              onPreview={setSelectedPreview}
+            />
           ))}
 
           {/* Add Agent Button */}
@@ -287,6 +250,14 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
           onClose={() => setError(null)}
         />
       )}
+
+      {/* Delete Agent Dialog */}
+      <DeleteAgentDialog
+        agentName={agentToDelete?.name || ''}
+        isOpen={!!agentToDelete}
+        onConfirm={confirmDelete}
+        onCancel={() => setAgentToDelete(null)}
+      />
     </>
   );
 } 
