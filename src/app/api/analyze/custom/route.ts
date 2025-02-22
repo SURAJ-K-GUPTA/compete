@@ -40,6 +40,9 @@ export async function POST(request: Request) {
         Content: ${comp.content}
       `).join('\n')}
 
+      Only analyze the target site based on the criteria and use competitors as only for reference.
+      You can give any number of suggestions for the target site but give suggestions separately for each paragraph.
+
       Return a JSON response with:
       {
         "score": number (0-100),

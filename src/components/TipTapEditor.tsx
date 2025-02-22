@@ -20,12 +20,59 @@ import { marked } from 'marked';
 interface Props {
   website: WebsiteData;
   preview: Preview | null;
-  showInitialContent?: boolean;
   onAccept?: (change: { old: string; new: string; type: string }) => void;
   onReject?: () => void;
 }
 
-export default function TipTapEditor({ website, preview, showInitialContent = false, onAccept, onReject }: Props) {
+export const markdownToPlainText = (markdown: string): string => {
+    // Remove links but keep the label
+    markdown = markdown.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1');
+  
+    // Remove bold (**text**) and italic (*text*)
+    markdown = markdown.replace(/\*\*(.*?)\*\*/g, '$1'); // Bold
+    markdown = markdown.replace(/\*(.*?)\*/g, '$1'); // Italic
+    markdown = markdown.replace(/__(.*?)__/g, '$1'); // Bold (alternative syntax)
+    markdown = markdown.replace(/_(.*?)_/g, '$1'); // Italic (alternative syntax)
+  
+    // Remove inline code (`code`)
+    markdown = markdown.replace(/`([^`]+)`/g, '$1');
+  
+    // Remove blockquotes
+    markdown = markdown.replace(/^> ?(.*)/gm, '$1');
+  
+    // Remove images ![alt](url)
+    markdown = markdown.replace(/!\[.*?\]\(.*?\)/g, '');
+  
+    // Convert headings (#, ##, ###, etc.) to plain text
+    markdown = markdown.replace(/#+\s?(.*)/g, '$1');
+  
+    // Remove horizontal rules (---, ***)
+    markdown = markdown.replace(/^[-*_]{3,}$/gm, '');
+  
+    // Convert unordered lists (- item, * item, + item) to plain text
+    markdown = markdown.replace(/^\s*[-*+]\s+/gm, '- ');
+  
+    // Convert numbered lists (1. item) to plain text
+    markdown = markdown.replace(/^\s*\d+\.\s+/gm, '1. ');
+  
+    // Remove strikethrough (~~text~~)
+    markdown = markdown.replace(/~~(.*?)~~/g, '$1');
+  
+    // Remove tables (basic support)
+    markdown = markdown.replace(/^\|.*\|$/gm, ''); // Remove table rows
+    markdown = markdown.replace(/[-:|]+\s*/g, ''); // Remove table dividers
+  
+    // Remove HTML tags (optional, if markdown contains HTML)
+    markdown = markdown.replace(/<[^>]+>/g, '');
+  
+    // Remove extra spaces and trim
+    markdown = markdown.replace(/\s+/g, ' '); // Replace multiple spaces with one
+    markdown = markdown.replace(/\n{2,}/g, '\n'); // Reduce multiple newlines to one
+  
+    return markdown.trim();
+  };
+
+export default function TipTapEditor({ website, preview, onAccept, onReject }: Props) {
   const [originalContent, setOriginalContent] = useState('');
 
   const editor = useEditor({
@@ -58,8 +105,6 @@ export default function TipTapEditor({ website, preview, showInitialContent = fa
 
   // Update editor content when website changes
   useEffect(() => {
-    if (!editor || !website) return;
-
     // Convert markdown content to HTML using marked
     const formattedContent = `
       <div class="website-content">
@@ -70,13 +115,13 @@ export default function TipTapEditor({ website, preview, showInitialContent = fa
         </div>
       </div>
     `;
-
-    // Set content immediately if showInitialContent is true or if there's a preview
-    if (showInitialContent || preview) {
-      setOriginalContent(formattedContent);
+    setOriginalContent(formattedContent);
+    
+    // Update editor content if it exists
+    if (editor) {
       editor.commands.setContent(formattedContent);
     }
-  }, [website, editor, showInitialContent, preview]);
+  }, [website, editor]);
 
   useEffect(() => {
     if (!editor || !preview) return;
@@ -132,6 +177,8 @@ export default function TipTapEditor({ website, preview, showInitialContent = fa
     if (!editor || !preview) return;
 
     const { type, original, suggested } = preview;
+
+    const plainOriginal = markdownToPlainText(original);
     
     // Get current content
     const content = editor.getHTML();

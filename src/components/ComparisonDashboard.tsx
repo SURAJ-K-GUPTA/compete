@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebsiteData, MetaAnalysis, HeadingAnalysis, CustomAgent } from '@/types';
-import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2 } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlus } from 'react-icons/fi';
 import MetaCard from './MetaCard';
 import SuggestionCard from './SuggestionCard';
 import PreviewEditor from './PreviewEditor';
@@ -86,14 +86,6 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
     setExpandedAgent(newAgent.id);
   };
 
-  // Add delete handler
-  const handleDeleteAgent = (agentId: string) => {
-    setCustomAgents(agents => agents.filter(a => a.id !== agentId));
-    if (expandedAgent === agentId) {
-      setExpandedAgent(null);
-    }
-  };
-
   return (
     <>
       <div className="flex gap-8">
@@ -104,7 +96,6 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
               preview={selectedPreview}
               onClose={() => setSelectedPreview(null)}
               targetSite={targetSite}
-              showInitialContent={true}
             />
           </div>
         </div>
@@ -213,23 +204,13 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
           {/* Custom Agent Cards */}
           {customAgents.map(agent => (
             <div key={agent.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 flex justify-between items-center hover:bg-gray-50">
-                <button
-                  onClick={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
-                  className="flex-1 text-left"
-                >
-                  <h3 className="text-lg font-medium text-gray-800">{agent.name}</h3>
-                </button>
-                <div className="flex items-center gap-2">
-                  {expandedAgent === agent.id ? <FiChevronUp /> : <FiChevronDown />}
-                  <button
-                    onClick={() => handleDeleteAgent(agent.id)}
-                    className="ml-2 p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full"
-                  >
-                    <FiTrash2 size={16} />
-                  </button>
-                </div>
-              </div>
+              <button
+                onClick={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
+                className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50"
+              >
+                <h3 className="text-lg font-medium text-gray-800">{agent.name}</h3>
+                {expandedAgent === agent.id ? <FiChevronUp /> : <FiChevronDown />}
+              </button>
               <AnimatePresence>
                 {expandedAgent === agent.id && (
                   <motion.div
