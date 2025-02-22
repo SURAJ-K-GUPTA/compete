@@ -50,17 +50,24 @@ export default function HeadingAnalysisAgent({
             exit={{ height: 0, opacity: 0 }}
             className="px-4 pb-4"
           >
-            <HeadingAnalysisDashboard
-              analysis={analysis}
-              onPreview={(suggestion) => {
-                onPreview({
-                  type: 'heading',
-                  original: suggestion.original,
-                  suggested: suggestion.suggested,
-                  html
-                });
-              }}
-            />
+            {isReanalyzing ? (
+              <div className="space-y-4 animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+                <div className="h-24 bg-gray-200 rounded"></div>
+              </div>
+            ) : (
+              <HeadingAnalysisDashboard
+                analysis={analysis}
+                onPreview={(suggestion) => {
+                  onPreview({
+                    type: 'heading',
+                    original: suggestion.original,
+                    suggested: suggestion.suggested,
+                    html
+                  });
+                }}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>

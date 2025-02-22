@@ -51,50 +51,59 @@ export default function MetaAnalysisAgent({
             exit={{ height: 0, opacity: 0 }}
             className="px-4 pb-4"
           >
-            <MetaCard
-              title="Title Analysis"
-              score={analysis.titleScore}
-              length={analysis.titleLength}
-              maxLength={60}
-              original={targetSite.title}
-            />
-            {analysis.suggestions
-              .filter(s => s.type === 'title')
-              .map((suggestion, index) => (
-                <SuggestionCard
-                  key={`title-${index}`}
-                  suggestion={suggestion}
-                  onPreview={() => {
-                    onPreview({
-                      type: suggestion.type,
-                      original: suggestion.original,
-                      suggested: suggestion.suggested
-                    });
-                  }}
+            {isReanalyzing ? (
+              <div className="space-y-4 animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-1/3"></div>
+                <div className="h-24 bg-gray-200 rounded"></div>
+              </div>
+            ) : (
+              <>
+                <MetaCard
+                  title="Title Analysis"
+                  score={analysis.titleScore}
+                  length={analysis.titleLength}
+                  maxLength={60}
+                  original={targetSite.title}
                 />
-              ))}
-            <MetaCard
-              title="Description Analysis"
-              score={analysis.descriptionScore}
-              length={analysis.descriptionLength}
-              maxLength={155}
-              original={targetSite.metaDescription}
-            />
-            {analysis.suggestions
-              .filter(s => s.type === 'description')
-              .map((suggestion, index) => (
-                <SuggestionCard
-                  key={`description-${index}`}
-                  suggestion={suggestion}
-                  onPreview={() => {
-                    onPreview({
-                      type: suggestion.type,
-                      original: suggestion.original,
-                      suggested: suggestion.suggested
-                    });
-                  }}
+                {analysis.suggestions
+                  .filter(s => s.type === 'title')
+                  .map((suggestion, index) => (
+                    <SuggestionCard
+                      key={`title-${index}`}
+                      suggestion={suggestion}
+                      onPreview={() => {
+                        onPreview({
+                          type: suggestion.type,
+                          original: suggestion.original,
+                          suggested: suggestion.suggested
+                        });
+                      }}
+                    />
+                  ))}
+                <MetaCard
+                  title="Description Analysis"
+                  score={analysis.descriptionScore}
+                  length={analysis.descriptionLength}
+                  maxLength={155}
+                  original={targetSite.metaDescription}
                 />
-              ))}
+                {analysis.suggestions
+                  .filter(s => s.type === 'description')
+                  .map((suggestion, index) => (
+                    <SuggestionCard
+                      key={`description-${index}`}
+                      suggestion={suggestion}
+                      onPreview={() => {
+                        onPreview({
+                          type: suggestion.type,
+                          original: suggestion.original,
+                          suggested: suggestion.suggested
+                        });
+                      }}
+                    />
+                  ))}
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

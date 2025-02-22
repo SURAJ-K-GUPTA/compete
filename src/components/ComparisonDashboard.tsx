@@ -43,6 +43,10 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
   const [error, setError] = useState<string | null>(null);
   const [reanalyzingAgents, setReanalyzingAgents] = useState<string[]>([]);
   const [agentToDelete, setAgentToDelete] = useState<CustomAgent | null>(null);
+  const [currentAnalysis, setCurrentAnalysis] = useState<{
+    meta: MetaAnalysis;
+    headings?: HeadingAnalysis | null;
+  }>(analysis);
 
   // Reset state when new analysis comes in
   useEffect(() => {
@@ -125,25 +129,44 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
     setReanalyzingAgents(prev => [...prev, agentId]);
     
     try {
-      const agent = customAgents.find(a => a.id === agentId);
-      if (!agent) return;
+      if (agentId === 'meta' || agentId === 'headings') {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            targetUrl: targetSite.url,
+            competitorUrls: competitors.map(c => c.url)
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          if (agentId === 'meta') {
+            setCurrentAnalysis(prev => ({ ...prev, meta: data.analysis.meta }));
+          } else {
+            setCurrentAnalysis(prev => ({ ...prev, headings: data.analysis.headings }));
+          }
+        }
+      } else {
+        const agent = customAgents.find(a => a.id === agentId);
+        if (!agent) return;
 
-      const response = await fetch('/api/analyze/custom', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: agent.prompt,
-          targetSite,
-          competitors,
-          systemPrompt: agent.systemPrompt,
-          userPrompt: agent.userPrompt
-        })
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCustomAgents(agents => agents.map(a => 
-          a.id === agentId ? { ...a, analysis: data.analysis } : a
-        ));
+        const response = await fetch('/api/analyze/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: agent.prompt,
+            targetSite,
+            competitors,
+            systemPrompt: agent.systemPrompt,
+            userPrompt: agent.userPrompt
+          })
+        });
+        const data = await response.json();
+        if (data.success) {
+          setCustomAgents(agents => agents.map(a => 
+            a.id === agentId ? { ...a, analysis: data.analysis } : a
+          ));
+        }
       }
     } catch (err) {
       setError('Failed to reanalyze');
@@ -170,7 +193,7 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
         <div className="w-[30%] space-y-4">
           {/* Meta Analysis */}
           <MetaAnalysisAgent
-            analysis={analysis.meta}
+            analysis={currentAnalysis.meta}
             targetSite={targetSite}
             isExpanded={expandedAgent === 'meta'}
             isReanalyzing={reanalyzingAgents.includes('meta')}
@@ -181,7 +204,7 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
 
           {/* Heading Analysis */}
           <HeadingAnalysisAgent
-            analysis={analysis.headings ?? null}
+            analysis={currentAnalysis.headings ?? null}
             isExpanded={expandedAgent === 'headings'}
             isReanalyzing={reanalyzingAgents.includes('headings')}
             onToggle={() => setExpandedAgent(expandedAgent === 'headings' ? null : 'headings')}
