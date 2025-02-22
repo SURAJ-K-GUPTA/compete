@@ -17,49 +17,6 @@ export async function analyzeHeadingStructure(
   competitors: WebsiteData[],
   searchTerms: string[] = []
 ): Promise<HeadingAnalysis> {
-  const prompt = `
-    Analyze the heading structure and topic organization and return a JSON response:
-
-    Target Site:
-    URL: ${targetSite.url}
-    Headings: ${JSON.stringify(targetSite.headings)}
-    
-    Competitors:
-    ${competitors.map(comp => `
-      URL: ${comp.url}
-      Headings: ${JSON.stringify(comp.headings)}
-    `).join('\n')}
-
-    Search Terms: ${searchTerms.join(', ')}
-
-    Analyze and provide in JSON format:
-    1. Heading depth analysis (H2, H3, H4 usage)
-    2. Topic segmentation comparison
-    3. Missing key topics from competitors
-    4. Search term optimization in headings
-    5. Information hierarchy suggestions
-
-    Return a JSON object with:
-    {
-      "headingDepthScore": number (0-100),
-      "topicCoverage": number (0-100),
-      "missingTopics": string[],
-      "searchTermOptimization": number (0-100),
-      "hierarchyScore": number (0-100),
-      "suggestions": [
-        {
-          "type": "structure" | "topic" | "searchTerm" | "hierarchy",
-          "original": string,
-          "suggested": string,
-          "reasoning": string,
-          "priority": number (1-5),
-          "position": number
-        }
-      ],
-      "competitorInsights": string[]
-    }
-  `;
-
   const defaultAnalysis: HeadingAnalysis = {
     headingDepthScore: 0,
     topicCoverage: 0,
@@ -73,14 +30,82 @@ export async function analyzeHeadingStructure(
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: "You are an SEO expert. Analyze the heading structure and topic organization of the provided website and its competitors."
+        },
+        {
+          role: "user",
+          content: `
+            Analyze the heading structure and topic organization:
+
+            Target Site:
+            URL: ${targetSite.url}
+            Headings: ${JSON.stringify(targetSite.headings)}
+            
+            Competitors:
+            ${competitors.map(comp => `
+              URL: ${comp.url}
+              Headings: ${JSON.stringify(comp.headings)}
+            `).join('\n')}
+
+            Search Terms: ${searchTerms.join(', ')}
+          `
+        }
+      ],
+      functions: [
+        {
+          name: "analyze_headings",
+          description: "Analyzes the heading structure and topic organization of a website and its competitors.",
+          parameters: {
+            type: "object",
+            properties: {
+              headingDepthScore: { type: "number", minimum: 0, maximum: 100 },
+              topicCoverage: { type: "number", minimum: 0, maximum: 100 },
+              missingTopics: { type: "array", items: { type: "string" } },
+              searchTermOptimization: { type: "number", minimum: 0, maximum: 100 },
+              hierarchyScore: { type: "number", minimum: 0, maximum: 100 },
+              suggestions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    type: { type: "string", enum: ["structure", "topic", "searchTerm", "hierarchy"] },
+                    original: { type: "string" },
+                    suggested: { type: "string" },
+                    reasoning: { type: "string" },
+                    priority: { type: "number", minimum: 1, maximum: 5 },
+                    position: { type: "number" }
+                  },
+                  required: ["type", "original", "suggested", "reasoning", "priority", "position"]
+                }
+              },
+              competitorInsights: { type: "array", items: { type: "string" } }
+            },
+            required: [
+              "headingDepthScore",
+              "topicCoverage",
+              "missingTopics",
+              "searchTermOptimization",
+              "hierarchyScore",
+              "suggestions",
+              "competitorInsights"
+            ]
+          }
+        }
+      ],
+      function_call: { name: "analyze_headings" },
       temperature: 0.7,
     });
 
-    const content = response.choices[0].message.content || '{}';
-    const parsedResponse = JSON.parse(content);
-    return { ...defaultAnalysis, ...parsedResponse };
+    const functionCall = response.choices[0].message.function_call;
+    if (functionCall && functionCall.name === "analyze_headings") {
+      const parsedResponse = JSON.parse(functionCall.arguments);
+      return { ...defaultAnalysis, ...parsedResponse };
+    } else {
+      throw new Error("Function call not returned by the model.");
+    }
   } catch (error) {
     console.error('Heading analysis failed:', error);
     return defaultAnalysis;

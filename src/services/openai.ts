@@ -14,45 +14,6 @@ export async function analyzeSEOMetadata(
   targetSite: WebsiteData,
   competitors: WebsiteData[]
 ): Promise<{ meta: MetaAnalysis; headings: HeadingAnalysis | null }> {
-  const prompt = `
-    Analyze the following website meta information and its competitors and return a JSON response:
-    
-    Target Site:
-    URL: ${targetSite.url}
-    Title: ${targetSite.title} (${targetSite.title.length} chars)
-    Meta Description: ${targetSite.metaDescription} (${targetSite.metaDescription.length} chars)
-    
-    Competitors:
-    ${competitors.map(comp => `
-      URL: ${comp.url}
-      Title: ${comp.title} (${comp.title.length} chars)
-      Meta Description: ${comp.metaDescription} (${comp.metaDescription.length} chars)
-    `).join('\n')}
-    
-    Return a JSON object with the following structure:
-    {
-      "titleLength": number,
-      "descriptionLength": number,
-      "titleScore": number (0-100),
-      "descriptionScore": number (0-100),
-      "powerWords": string[],
-      "searchIntent": string,
-      "uniqueValue": string,
-      "suggestions": [
-        {
-          "type": "title" | "description",
-          "original": string,
-          "suggested": string,
-          "reasoning": string,
-          "powerWords": string[],
-          "improvement": string
-        }
-      ]
-    }
-
-    Ensure all fields are present and properly formatted.
-  `;
-
   const defaultMetaAnalysis: MetaAnalysis = {
     titleLength: targetSite.title.length,
     descriptionLength: targetSite.metaDescription.length,
@@ -67,18 +28,72 @@ export async function analyzeSEOMetadata(
   try {
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
-      messages: [{ role: "user", content: prompt }],
-      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: "You are an SEO expert. Analyze the provided website metadata and its competitors to generate SEO recommendations. And make sure each property is returned in correct form" },
+        { role: "user", content: `
+          Analyze the following website meta information and its competitors:
+          
+          Target Site:
+          URL: ${targetSite.url}
+          Title: ${targetSite.title} (${targetSite.title.length} chars)
+          Meta Description: ${targetSite.metaDescription} (${targetSite.metaDescription.length} chars)
+          
+          Competitors:
+          ${competitors.map(comp => `
+            URL: ${comp.url}
+            Title: ${comp.title} (${comp.title.length} chars)
+            Meta Description: ${comp.metaDescription} (${comp.metaDescription.length} chars)
+          `).join('\n')}
+        `}
+      ],
+      functions: [
+        {
+          name: "analyze_metadata",
+          description: "Analyzes website metadata and provides SEO recommendations.",
+          parameters: {
+            type: "object",
+            properties: {
+              titleLength: { type: "number" },
+              descriptionLength: { type: "number" },
+              titleScore: { type: "number", minimum: 0, maximum: 100 },
+              descriptionScore: { type: "number", minimum: 0, maximum: 100 },
+              powerWords: { type: "array", items: { type: "string" } },
+              searchIntent: { type: "string" },
+              uniqueValue: { type: "string" },
+              suggestions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    type: { type: "string", enum: ["title", "description"] },
+                    original: { type: "string" },
+                    suggested: { type: "string" },
+                    reasoning: { type: "string" },
+                    powerWords: { type: "array", items: { type: "string" } },
+                    improvement: { type: "string" }
+                  },
+                  required: ["type", "original", "suggested", "reasoning", "powerWords", "improvement"]
+                }
+              }
+            },
+            required: ["titleLength", "descriptionLength", "titleScore", "descriptionScore", "powerWords", "searchIntent", "uniqueValue", "suggestions"]
+          }
+        }
+      ],
+      function_call: { name: "analyze_metadata" },
       temperature: 0.7,
     });
 
-    const content = response.choices[0].message.content || '{}';
-    const parsedResponse = JSON.parse(content);
-    
-    return {
-      meta: { ...defaultMetaAnalysis, ...parsedResponse },
-      headings: null // Heading analysis will be handled separately
-    };
+    const functionCall = response.choices[0].message.function_call;
+    if (functionCall && functionCall.name === "analyze_metadata") {
+      const parsedResponse = JSON.parse(functionCall.arguments);
+      return {
+        meta: { ...defaultMetaAnalysis, ...parsedResponse },
+        headings: null // Heading analysis will be handled separately
+      };
+    } else {
+      throw new Error("Function call not returned by the model.");
+    }
   } catch (error) {
     console.error('OpenAI analysis failed:', error);
     return {
@@ -86,4 +101,4 @@ export async function analyzeSEOMetadata(
       headings: null
     };
   }
-} 
+}

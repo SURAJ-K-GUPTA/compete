@@ -125,42 +125,25 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
     setReanalyzingAgents(prev => [...prev, agentId]);
     
     try {
-      if (agentId === 'meta' || agentId === 'headings') {
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            targetUrl: targetSite.url,
-            competitorUrls: competitors.map(c => c.url)
-          })
-        });
-        const data = await response.json();
-        if (data.success) {
-          if (agentId === 'meta') {
-            analysis.meta = data.analysis.meta;
-          } else {
-            analysis.headings = data.analysis.headings;
-          }
-        }
-      } else {
-        const agent = customAgents.find(a => a.id === agentId);
-        if (!agent) return;
+      const agent = customAgents.find(a => a.id === agentId);
+      if (!agent) return;
 
-        const response = await fetch('/api/analyze/custom', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            prompt: agent.prompt,
-            targetSite,
-            competitors
-          })
-        });
-        const data = await response.json();
-        if (data.success) {
-          setCustomAgents(agents => agents.map(a => 
-            a.id === agentId ? { ...a, analysis: data.analysis } : a
-          ));
-        }
+      const response = await fetch('/api/analyze/custom', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: agent.prompt,
+          targetSite,
+          competitors,
+          systemPrompt: agent.systemPrompt,
+          userPrompt: agent.userPrompt
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        setCustomAgents(agents => agents.map(a => 
+          a.id === agentId ? { ...a, analysis: data.analysis } : a
+        ));
       }
     } catch (err) {
       setError('Failed to reanalyze');
@@ -220,6 +203,7 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
               onReanalyze={() => handleReanalyze(agent.id)}
               onDelete={() => handleDeleteAgent(agent.id)}
               onPreview={setSelectedPreview}
+              setCustomAgents={setCustomAgents}
             />
           ))}
 

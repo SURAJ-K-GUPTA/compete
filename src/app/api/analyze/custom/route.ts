@@ -6,7 +6,9 @@ import { config } from '@/config/env';
 const openai = new OpenAI({
   apiKey: config.openai.apiKey
 });
+
 export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -24,59 +26,80 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const analysisPrompt = `
-      Analyze the following website and its competitors based on this criteria:
-      ${prompt}
-
-      Target Site:
-      URL: ${targetSite.url}
-      Title: ${targetSite.title}
-      Content: ${targetSite.content}
-      
-      Competitors:
-      ${competitors.map(comp => `
-        URL: ${comp.url}
-        Title: ${comp.title}
-        Content: ${comp.content}
-      `).join('\n')}
-
-      Only analyze the target site based on the criteria and use competitors as only for reference.
-      You can give any number of suggestions for the target site but give suggestions separately for each paragraph.
-
-      Return a JSON response with:
-      {
-        "score": number (0-100),
-        "suggestions": [
-          {
-            "original": "text that needs improvement",
-            "suggested": "improved version",
-            "reasoning": "why this change helps",
-            "score": number (improvement impact)
-          }
-        ],
-        "insights": [
-          "key insight about the analysis",
-          "competitive advantage or disadvantage",
-          "other relevant observations"
-        ]
-      }
-    `;
-
     const response = await openai.chat.completions.create({
       model: "gpt-4-turbo-preview",
-      messages: [{ role: "user", content: analysisPrompt }],
-      response_format: { type: "json_object" },
+      messages: [
+        {
+          role: "system",
+          content: body.systemPrompt || "You are an SEO and content analysis expert. Analyze the target website based on the provided criteria and use competitors as reference."
+        },
+        {
+          role: "user",
+          content:`
+            Analyze the following website and its competitors based on this criteria:
+            ${body.userPrompt || body.prompt}
+
+            Target Site:
+            URL: ${body.targetSite.url}
+            Title: ${body.targetSite.title}
+            Content: ${body.targetSite.content}
+            
+            Competitors:
+            ${body.competitors.map((comp: WebsiteData) => `
+              URL: ${comp.url}
+              Title: ${comp.title}
+              Content: ${comp.content}
+            `).join('\n')}
+
+            Only analyze the target site based on the criteria and use competitors as only for reference.
+            You can give any number of suggestions for the target site but give suggestions separately for each paragraph.
+          `
+        }
+      ],
+      functions: [
+        {
+          name: "analyze_custom_content",
+          description: "Analyzes the target website based on the provided criteria and uses competitors as reference.",
+          parameters: {
+            type: "object",
+            properties: {
+              score: { type: "number", minimum: 0, maximum: 100 },
+              suggestions: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    original: { type: "string" },
+                    suggested: { type: "string" },
+                    reasoning: { type: "string" },
+                    score: { type: "number" }
+                  },
+                  required: ["original", "suggested", "reasoning", "score"]
+                }
+              },
+              insights: {
+                type: "array",
+                items: { type: "string" }
+              }
+            },
+            required: ["score", "suggestions", "insights"]
+          }
+        }
+      ],
+      function_call: { name: "analyze_custom_content" },
       temperature: 0.7,
     });
 
-    const content = response.choices[0].message.content || '{}';
-    const analysis = JSON.parse(content) as CustomAnalysis;
-
-    return NextResponse.json({
-      success: true,
-      analysis
-    });
-
+    const functionCall = response.choices[0].message.function_call;
+    if (functionCall && functionCall.name === "analyze_custom_content") {
+      const analysis = JSON.parse(functionCall.arguments) as CustomAnalysis;
+      return NextResponse.json({
+        success: true,
+        analysis
+      });
+    } else {
+      throw new Error("Function call not returned by the model.");
+    }
   } catch (error) {
     console.error('Custom analysis failed:', error);
     return NextResponse.json({
@@ -85,4 +108,4 @@ export async function POST(request: Request) {
       analysis: null
     }, { status: 500 });
   }
-} 
+}

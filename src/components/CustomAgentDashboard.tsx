@@ -54,7 +54,25 @@ export default function CustomAgentDashboard({ agent, targetSite, competitors, o
     <div className="space-y-6">
       <div className="bg-white rounded-xl p-4">
         <h3 className="text-lg font-medium text-gray-800 mb-2">{agent.name}</h3>
-        <div className="text-sm text-gray-600">{agent.prompt}</div>
+        <div className="text-sm text-gray-600">
+          <p className="font-medium">Analysis Prompt:</p>
+          <p>{agent.prompt}</p>
+        </div>
+      </div>
+
+      <div className="mb-4 space-y-2">
+        {agent.systemPrompt && (
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <h4 className="text-sm font-medium mb-1">System Prompt</h4>
+            <p className="text-sm text-gray-600">{agent.systemPrompt}</p>
+          </div>
+        )}
+        {agent.userPrompt && (
+          <div className="bg-gray-50 p-3 rounded-lg">
+            <h4 className="text-sm font-medium mb-1">User Prompt</h4>
+            <p className="text-sm text-gray-600">{agent.userPrompt}</p>
+          </div>
+        )}
       </div>
 
       {agent.analysis ? (

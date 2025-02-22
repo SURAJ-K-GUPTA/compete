@@ -61,6 +61,8 @@ export interface CustomAgent {
   name: string;
   prompt: string;
   analysis: CustomAnalysis | null;
+  systemPrompt?: string;
+  userPrompt?: string;
 }
 
 export interface CustomAnalysis {
