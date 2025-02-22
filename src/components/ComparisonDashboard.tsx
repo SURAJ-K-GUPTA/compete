@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebsiteData, MetaAnalysis, HeadingAnalysis, CustomAgent } from '@/types';
-import { FiChevronDown, FiChevronUp, FiPlus } from 'react-icons/fi';
+import { FiChevronDown, FiChevronUp, FiPlus, FiTrash2 } from 'react-icons/fi';
 import MetaCard from './MetaCard';
 import SuggestionCard from './SuggestionCard';
 import PreviewEditor from './PreviewEditor';
@@ -50,30 +50,39 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
 
   // Run custom agent analyses when data changes
   useEffect(() => {
-    customAgents.forEach(async (agent) => {
-      if (!agent.analysis) {
-        try {
-          const response = await fetch('/api/analyze/custom', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              prompt: agent.prompt,
-              targetSite,
-              competitors
-            })
-          });
-          const data = await response.json();
-          if (data.success) {
-            setCustomAgents(agents => agents.map(a => 
-              a.id === agent.id ? { ...a, analysis: data.analysis } : a
-            ));
+    const analyzeAgents = async () => {
+      const updatedAgents = await Promise.all(
+        customAgents.map(async (agent) => {
+          if (agent.analysis) return agent;
+          
+          try {
+            const response = await fetch('/api/analyze/custom', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                prompt: agent.prompt,
+                targetSite,
+                competitors
+              })
+            });
+            const data = await response.json();
+            if (data.success) {
+              return { ...agent, analysis: data.analysis };
+            }
+          } catch (err) {
+            console.error('Custom agent analysis failed:', err);
           }
-        } catch (err) {
-          console.error('Custom agent analysis failed:', err);
-        }
-      }
-    });
-  }, [customAgents, targetSite, competitors]);
+          return agent;
+        })
+      );
+      
+      setCustomAgents(updatedAgents);
+    };
+
+    if (customAgents.some(agent => !agent.analysis)) {
+      analyzeAgents();
+    }
+  }, [targetSite, competitors]);
 
   const handleAddAgent = async (name: string, prompt: string) => {
     const newAgent: CustomAgent = {
@@ -84,6 +93,14 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
     };
     setCustomAgents([...customAgents, newAgent]);
     setExpandedAgent(newAgent.id);
+  };
+
+  // Add delete handler
+  const handleDeleteAgent = (agentId: string) => {
+    setCustomAgents(agents => agents.filter(a => a.id !== agentId));
+    if (expandedAgent === agentId) {
+      setExpandedAgent(null);
+    }
   };
 
   return (
@@ -204,13 +221,23 @@ export default function SEOComparisonDashboard({ analysis, targetSite, competito
           {/* Custom Agent Cards */}
           {customAgents.map(agent => (
             <div key={agent.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
-              <button
-                onClick={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
-                className="w-full px-4 py-3 flex justify-between items-center hover:bg-gray-50"
-              >
-                <h3 className="text-lg font-medium text-gray-800">{agent.name}</h3>
-                {expandedAgent === agent.id ? <FiChevronUp /> : <FiChevronDown />}
-              </button>
+              <div className="px-4 py-3 flex justify-between items-center hover:bg-gray-50">
+                <button
+                  onClick={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
+                  className="flex-1 text-left"
+                >
+                  <h3 className="text-lg font-medium text-gray-800">{agent.name}</h3>
+                </button>
+                <div className="flex items-center gap-2">
+                  {expandedAgent === agent.id ? <FiChevronUp /> : <FiChevronDown />}
+                  <button
+                    onClick={() => handleDeleteAgent(agent.id)}
+                    className="ml-2 p-1.5 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full"
+                  >
+                    <FiTrash2 size={16} />
+                  </button>
+                </div>
+              </div>
               <AnimatePresence>
                 {expandedAgent === agent.id && (
                   <motion.div
