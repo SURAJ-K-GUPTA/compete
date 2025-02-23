@@ -27,7 +27,7 @@ export async function analyzeSEOMetadata(
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo-preview",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: "You are an SEO expert. Analyze the provided website metadata and its competitors to generate SEO recommendations. And make sure each property is returned in correct form" },
         { role: "user", content: `
