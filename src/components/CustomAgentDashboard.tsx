@@ -84,7 +84,7 @@ export default function CustomAgentDashboard({ agent, targetSite, competitors, o
             </div>
           </div>
 
-          {agent.analysis.insights.length > 0 && (
+          {agent.analysis?.insights?.length > 0 && (
             <div className="bg-blue-50 rounded-xl p-4">
               <h4 className="text-sm font-medium text-blue-800 mb-2">Insights</h4>
               <ul className="space-y-2">
@@ -95,7 +95,7 @@ export default function CustomAgentDashboard({ agent, targetSite, competitors, o
             </div>
           )}
 
-          {agent.analysis.suggestions.length > 0 && (
+          {agent.analysis?.suggestions?.length > 0 && (
             <div className="space-y-4">
               <h4 className="text-lg font-medium text-gray-800">Suggestions</h4>
               <div className="grid gap-4">
